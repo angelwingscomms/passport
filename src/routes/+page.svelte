@@ -18,7 +18,9 @@
 		w = 1320.283,
 		h = 1700.079,
 		el: HTMLDivElement,
-		single: HTMLDivElement;
+		single: HTMLDivElement,
+		viewMode = 'screen', // 'screen' or 'print'
+		screenScale = 0.25; // Scale factor for screen viewing
 
 	// $: position = `${left}px ${top}px`;
 	// $: console.log(w);
@@ -119,10 +121,26 @@
 			label={src ? 'change image' : 'add image'}
 			on:change={async ({ detail }) => {
 				loading = true;
-				try{const r = await import('@imgly/background-removal');
-				src = URL.createObjectURL(new Blob([await r.default(detail[0])], { type: 'image/png' }));} catch (e) {
-					console.error('rm error', e)
-					alert(`rm error: ${e}`)
+				try {
+					const formData = new FormData();
+					formData.append('image', detail[0]);
+
+					const response = await fetch('/removebg', {
+						method: 'POST',
+						body: formData
+					});
+
+					if (!response.ok) {
+						const errorData = await response.json();
+						throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+					}
+
+					const blob = await response.blob();
+					src = URL.createObjectURL(blob);
+					console.log('Background removal completed, src set to:', src);
+				} catch (e) {
+					console.error('Background removal error:', e);
+					alert(`Background removal error: ${e instanceof Error ? e.message : e}`);
 				}
 				loading = false;
 			}}
@@ -134,11 +152,12 @@
 		<div class="flex flex-col gap-3">
 			<div
 				bind:this={el}
-				class=" flex flex-wrap content-start h-[3850px] w-[5740px] bg-slate-700"
+				class="grid gap-4 bg-slate-700 {viewMode === 'screen' ? 'max-w-full max-h-screen overflow-auto p-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-4' : 'h-[3850px] w-[5740px] flex flex-wrap content-start'}"
+				style="{viewMode === 'screen' ? '' : ''}"
 			>
-					<Passport bind:el={single} bind:w bind:h bind:top bind:left bind:color bind:src />
+					<Passport bind:el={single} bind:w bind:h bind:top bind:left bind:color bind:src {viewMode} {screenScale} />
 					{#each Array(count-1) as _}
-					<Passport bind:w bind:h bind:top bind:left bind:color bind:src />
+					<Passport bind:w bind:h bind:top bind:left bind:color bind:src {viewMode} {screenScale} />
 				{/each}
 			</div>
 
@@ -147,6 +166,26 @@
 				<ColorInput bind:color id="color" label="set background color" />
 				<Button on:click={download_single} text="download single" />
 				<Button on:click={download_single_without_background} text="download single without background" />
+
+				<!-- View Mode Toggle -->
+				<div class="flex gap-2 items-center">
+					<label class="text-white text-sm">View:</label>
+					<Button
+						text="Screen View"
+						on:click={() => viewMode = 'screen'}
+						disabled={viewMode === 'screen'}
+					/>
+					<Button
+						text="Print View"
+						on:click={() => viewMode = 'print'}
+						disabled={viewMode === 'print'}
+					/>
+				</div>
+
+				<!-- Passport Count Info -->
+				<div class="text-white text-sm">
+					Showing {count} passport{count !== 1 ? 's' : ''}
+				</div>
 				<div class="print:hidden flex flex-col items-center gap-1">
 					<div>
 						<Button
@@ -181,19 +220,23 @@
 				</div>
 				<div class="flex gap-1">
 					<Button
-						text="reduce"
-						on:mousedown={() => (interval = setInterval(() => /*fit_w ? w-- : */ w--, 144))}
+						text="reduce size"
+						on:mousedown={() => (interval = setInterval(() => w--, 144))}
 						on:mouseup={() => clearInterval(interval)}
 					/>
 					<Button
-						text="increase"
-						on:mousedown={() => (interval = setInterval(() => /*fit_w ? w++ : */ w++, 144))}
+						text="increase size"
+						on:mousedown={() => (interval = setInterval(() => w++, 144))}
 						on:mouseup={() => clearInterval(interval)}
 					/>
 				</div>
-				<!-- <Toggle id="fit_w" label="fit width" bind:checked={fit_w} /> -->
-				<Button text="remove one" on:click={() => count--} />
-				<Button text="add one" on:click={() => count++} />
+
+				<!-- Passport Count Controls -->
+				<div class="flex gap-1 items-center">
+					<Button text="remove passport" on:click={() => count = Math.max(1, count - 1)} disabled={count <= 1} />
+					<span class="text-white text-sm">Count: {count}</span>
+					<Button text="add passport" on:click={() => count++} />
+				</div>
 			</div>
 		</div>
 	{:else if loading}

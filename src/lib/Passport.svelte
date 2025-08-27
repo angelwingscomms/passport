@@ -5,8 +5,13 @@
 		top: number,
 		left: number,
 		color: string,
-		el: HTMLDivElement | undefined = undefined;
+		el: HTMLDivElement | undefined = undefined,
+		viewMode: string = 'screen',
+		screenScale: number = 0.15;
 	import { onMount } from 'svelte';
+
+	// Debug: log when component is created
+	console.log('Passport created with src:', src ? 'has image' : 'no image', 'viewMode:', viewMode, 'scale:', screenScale);
 
 	onMount(async () => {
 		const Hammer = await import('hammerjs');
@@ -39,16 +44,26 @@
 
 <div
 	bind:this={el}
-	style="background-color: {color};"
-	class="w-[1320.283px] h-[1700.079px] border-[1px] border-solid border-slate-100 relative flex justify-center items-center overflow-hidden"
+	style="background-color: {color}; {viewMode === 'screen' ? `width: ${Math.max(200, 1320.283 * screenScale)}px; height: ${Math.max(200, 1700.079 * screenScale)}px;` : ''}"
+	class="border-[1px] border-solid border-slate-100 relative flex justify-center items-center overflow-hidden"
+	class:w-[1320.283px]={viewMode === 'print'}
+	class:h-[1700.079px]={viewMode === 'print'}
 >
-	<div style=" top: {top}px; left: {left}px" class="relative w-fit h-fit">
-		<div style="width: {w}px; height: {h}px" class="flex justify-center items-center">
+	<div
+		style=" top: {top * screenScale}px; left: {left * screenScale}px"
+		class="relative w-fit h-fit"
+	>
+		<div
+			style="width: {w * (viewMode === 'screen' ? screenScale : 1)}px; height: {h * (viewMode === 'screen' ? screenScale : 1)}px"
+			class="flex justify-center items-center"
+		>
 			<img
 				alt="passport with removed background"
 				class="img"
-				style="inline-size: 100%; block-size: auto"
+				style="inline-size: 100%; block-size: auto; object-fit: contain;"
 				{src}
+				on:load={() => console.log('Image loaded successfully')}
+				on:error={(e) => console.error('Image failed to load:', e)}
 			/>
 		</div>
 	</div>
